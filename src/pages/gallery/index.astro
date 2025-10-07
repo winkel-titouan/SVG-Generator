@@ -1,0 +1,35 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import pb from "../../utils/pb";
+import { Collections } from "../../utils/pocketbase-types";
+import { ui } from "../../i18n/ui.js";
+
+const svgList = await pb
+    .collection(Collections.Svg)
+    .getFullList({
+        sort: "-created",
+    }); 
+
+const locale = Astro.locals.lang as 'en' | 'fr' ?? 'en';
+---
+
+<Layout title={ui[locale].gallery.title}>
+    <div class="max-w-7xl mx-auto p-6">
+        <h1 class="text-4xl font-bold mb-8 text-center text-primary">{ui[locale].gallery.title}</h1>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+            {svgList.map((svg) => (
+                <div class="card bg-base-100 shadow-xl flex flex-col items-center transition-transform hover:scale-105">
+                    <div class="card-body w-full flex flex-col items-center p-4">
+                        <h2 class="card-title text-2xl mb-2 text-center text-secondary">{svg.nom}</h2>
+                        <figure class="w-full h-48 mb-4 bg-base-200 rounded-box flex items-center justify-center overflow-hidden">
+                            <div class="max-w-full max-h-full" set:html={svg.code_svg}></div>
+                        </figure>
+                        <div class="card-actions mt-auto w-full flex justify-center">
+                            <a href={`/gallery/${svg.id}`} class="btn btn-secondary btn-outline w-full">{ui[locale].gallery.viewDetails}</a>
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    </div>
+</Layout>

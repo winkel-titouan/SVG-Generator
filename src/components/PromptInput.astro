@@ -1,0 +1,46 @@
+---
+
+const { chatHistory } = Astro.props;
+console.log("PromptInput received chatHistory:", chatHistory);
+---
+
+<prompt-input data-chat={JSON.stringify(chatHistory || [])} class="w-full">
+    <label class="input input-bordered flex items-center gap-2">
+        <input
+            id="edit-prompt"
+            type="text"
+            class="grow"
+            placeholder="Enter a prompt to edit the SVG..."
+        />
+    </label>
+    <button class="btn btn-primary w-full mt-2" type="button" >Edit SVG</button>
+</prompt-input>
+<script>
+    //@ts-nocheck
+    class PromptInput extends HTMLElement {
+        connectedCallback() {
+            // Read the message from the data attribute.
+            const history = JSON.parse(this.dataset.chat);
+            console.log("PromptInput history:", history);
+            const button = this.querySelector('button');
+            const input = document.getElementById('edit-prompt')?.textContent;
+            console.log('Input value:', input);
+            
+            history.push({ role: 'user', content: input });
+            async function generateSVG(prompt) {
+                console.log("Generating SVG for prompt:", prompt);
+                const res = await fetch("/api/generateSVG", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ prompt }),
+                });
+                const data = await res.json();
+                return data.svg;
+            }
+
+            button.addEventListener('click', async () => { await generateSVG(history); });
+            }
+    }
+
+    customElements.define('prompt-input', PromptInput);
+</script>

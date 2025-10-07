@@ -1,0 +1,174 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { ui } from "../i18n/ui.js";
+import { getLocale } from "../utils/locale.js";
+
+const locale = Astro.locals.lang as 'en' | 'fr' ?? 'en';
+console.log('Locale in generator:', locale);
+
+---
+
+<Layout title={ui[locale].generator.title}>
+	<div class="flex flex-col h-full glass bg-primary">
+		<div class="mx-auto grid grid-cols-2 gap-4 flex-1 w-screen p-4">
+			<div
+				class="bg-gradient-to-b from-white to-gray-200 rounded-box flex items-center justify-center h-full relative"
+			>
+				<div
+					id="svg-container"
+					class="w-full h-full flex items-center justify-center"
+				>
+					<span class="text-gray-500"
+						>{ui[locale].generator.contentPlaceholder}</span
+					>
+				</div>
+				<button
+					class="btn btn-circle btn-secondary absolute top-4 right-4"
+					id="save-button"
+					title="save">Save</button
+				>
+			</div>
+			<div class="flex items-center justify-center h-full">
+				<div class="mockup-code w-full h-full">
+					<pre><code id="svg-output" contenteditable="true" class="outline-none">{ui[locale].generator.codePlaceholder}</code></pre>
+					<button
+						class="btn btn-circle btn-secondary absolute top-4 right-4"
+						id="view-button"
+						title="view">{ui[locale].generator.viewButton}</button
+					>
+				</div>
+			</div>
+		</div>
+		<div class="flex items-center justify-center w-full left-0">
+			<textarea
+				class="textarea w-full"
+				placeholder="Prompt"
+				id="user-prompt"></textarea>
+			<div class="flex flex-col">
+				<button class="btn btn-secondary m-2" id="generate-button"
+					>{ui[locale].generator.generateButton}</button
+				>
+				<button class="btn btn-secondary m-2" id="edit-button"
+					>{ui[locale].generator.editButton}</button
+				>
+			</div>
+		</div>
+	</div>
+</Layout>
+
+<script>
+	//@ts-nocheck
+	const generateButton = document.getElementById("generate-button");
+	const viewButton = document.getElementById("view-button");
+	const editButton = document.getElementById("edit-button");
+	let promptList = [];
+
+	if (viewButton) {
+		viewButton.addEventListener("click", () => {
+			const svgContainer = document.getElementById("svg-container");
+			const svgOutput = document.getElementById("svg-output");
+			svgContainer.innerHTML = svgOutput.textContent;
+		});
+	}
+	const saveButton = document.getElementById("save-button");
+
+	async function saveSVG(params) {
+		const res = await fetch("/api/saveSVG", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(params),
+		});
+		const data = await res.json();
+		return data;
+	}
+	if (saveButton) {
+		saveButton.addEventListener("click", async () => {
+			const name = prompt("Enter a name for the SVG:");
+			const svgOutput = document.getElementById("svg-output")?.textContent;
+			console.log("Saving SVG: ", JSON.stringify(svgOutput));
+			
+			const params: Collection.Svg = {
+				nom: name,
+				code_svg: svgOutput || "<svg></svg>",
+				chat_history: JSON.stringify(promptList),
+			};
+			await saveSVG(params);
+		});
+	}
+			
+	
+
+	async function generateSVG(prompt) {
+		console.log("Generating SVG for prompt:", prompt);
+		console.log( JSON.stringify({ prompt }));
+		console.log( JSON.stringify( prompt ));
+		const res = await fetch("/api/generateSVG", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(prompt),
+		});
+		const data = await res.json();
+		return data.svg;
+	}
+
+
+
+	async function handleSubmit() {
+		let prompt = "";
+		let aiResponse = "";
+		const promptElement = document.getElementById("user-prompt");
+		prompt = promptElement ? promptElement.value : "";
+		console.log("submitted: ", prompt);
+		promptList.length = 0; // Clear previous prompts
+		promptList.push({ role: "user", content: prompt });
+		const svgContainer = document.getElementById("svg-container");
+		// Show loading spinner
+		svgContainer.innerHTML = `<span class="loading loading-ring loading-xl"></span>`;
+		generateButton.disabled = true;
+		editButton.disabled = true;
+		let svgOutput = document.getElementById("svg-output");
+		aiResponse = await generateSVG(promptList);
+		const svgMatch = aiResponse.content.match(/<svg[\s\S]*?<\/svg>/i);
+		aiResponse.content = svgMatch ? svgMatch[0] : "";
+		console.log("svgCode: ", aiResponse.content);
+		promptList.push(aiResponse);
+		svgOutput.textContent = aiResponse.content;
+		svgContainer.innerHTML = aiResponse.content;
+		generateButton.disabled = false;
+		editButton.disabled = false;
+	}
+
+	async function handleEdit() {
+		let prompt = "";
+		let aiResponse = "";
+		const promptElement = document.getElementById("user-prompt");
+		prompt = promptElement ? promptElement.value : "";
+		console.log("submitted: ", prompt);
+		promptList.push({ role: "user", content: prompt });
+		const svgContainer = document.getElementById("svg-container");
+		// Show loading spinner
+		svgContainer.innerHTML += `<span class="loading loading-ring loading-xl"></span>`;
+		generateButton.disabled = true;
+		editButton.disabled = true;
+		let svgOutput = document.getElementById("svg-output");
+		aiResponse = await generateSVG(promptList);
+		const svgMatch = aiResponse.content.match(/<svg[\s\S]*?<\/svg>/i);
+		aiResponse.content = svgMatch ? svgMatch[0] : "";
+		console.log("svgCode: ", aiResponse.content);
+		console.log("svgCode: ", aiResponse);
+		promptList.push(aiResponse);
+		svgOutput.textContent = aiResponse.content;
+		svgContainer.innerHTML = aiResponse.content;
+		generateButton.disabled = false;
+		editButton.disabled = false;
+		console.log("userPrompts: ", promptList);
+	}
+
+	if (generateButton) {
+		generateButton.addEventListener("click", handleSubmit);
+	}
+
+	if (editButton) {
+		editButton.addEventListener("click", handleEdit);
+	}
+</script>

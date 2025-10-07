@@ -1,0 +1,59 @@
+---
+//@ts-nocheck
+import "../styles/global.css";
+import { ui } from "../i18n/ui.js";
+
+const title = Astro.props.title || "Astro Basics";
+let locale =  Astro.locals.lang as 'en' | 'fr' ?? 'en';
+console.log('Astro.locals in Layout:', Astro.locals);
+
+
+// // Handle POST request for language change BEFORE any other processing
+// if (Astro.request.method === "POST") {
+//     const formData = await Astro.request.formData();
+//     const selectedLanguage = formData.get("language");
+    
+//     if (selectedLanguage === "en" || selectedLanguage === "fr") {
+//         Astro.cookies.set('locale', selectedLanguage);
+// 		locale = selectedLanguage;
+		 
+// 		// Use the current URL for redirect
+// 		return Astro.redirect(Astro.url.pathname);
+//     }
+// }
+// locale = await getLocale(Astro) as 'en' | 'fr' ?? 'en';
+// Only set locale from cookies/preferences for GET requests
+
+---
+<!doctype html>
+<html lang={locale} data-theme="light" class="h-full">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="generator" content={Astro.generator} />
+        <title>{title}</title>
+    </head>
+    <body class="h-full">
+        <div class="h-full flex flex-col min-h-0">
+            <ul class="menu menu-vertical lg:menu-horizontal bg-base-200 rounded-box w-full">
+                <li><a href="/">{ui[locale].nav.home}</a></li>
+                <li><a href="/generator">{ui[locale].nav.generator}</a></li>
+                <li><a href="/gallery">{ui[locale].nav.gallery}</a></li>
+                <li>
+                    <form method="POST" action={Astro.url.pathname} class="m-0 p-0">
+                        <select name="language" class="select" onchange="this.form.submit()">
+                            <option disabled selected="true">{ui[locale].nav.language}</option>
+                            <option value="en" >English</option>
+                            <option value="fr" >Français</option>
+                        </select>
+                    </form>
+                </li>
+            </ul>
+
+            <div class="flex-1 min-h-0">
+                <slot />
+            </div>
+        </div>
+    </body>
+</html>

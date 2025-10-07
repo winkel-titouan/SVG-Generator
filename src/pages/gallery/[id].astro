@@ -1,0 +1,213 @@
+---
+import Layout from "@src/layouts/Layout.astro";
+import pb from "@src/utils/pb";
+import { Collections, type SvgRecord } from "@src/utils/pocketbase-types";
+
+const id = Astro.params.id;
+if (!id) {
+    throw new Error("SVG id parameter is missing.");
+}
+
+let svg: SvgRecord | null = null;
+try {
+    svg = await pb.collection(Collections.Svg).getOne(id);
+} catch (error) {
+    console.error("Failed to fetch SVG:", error);
+    Astro.redirect("/gallery");
+}
+
+// if(Astro.request.method === 'POST') {
+//     const formData = await Astro.request.formData();
+//     const editPrompt = formData.get('editPrompt')?.toString().trim();
+//     console.log('test', editPrompt);
+
+//     if (editPrompt && svg) {
+//         // Append the new user prompt to the chat history
+//         let chatHistory = svg.chat_history;
+//         if (typeof chatHistory === 'string') {
+//             try { chatHistory = JSON.parse(chatHistory); } catch { chatHistory = []; }
+//         }
+//         if (!Array.isArray(chatHistory)) chatHistory = [];
+//         chatHistory.push({ role: 'user', content: editPrompt });
+
+//         // Call the API to generate a new SVG based on the updated chat history
+//         const res = await fetch('http://localhost:4321/api/generateSVG', {
+//             method: 'POST',
+//             headers: { 'Content-Type': 'application/json' },
+//             body: JSON.stringify({ prompt: chatHistory }),
+//         });
+//         const data = await res.json();
+//         const dataSvg = data.svg;
+
+//         const svgMatch = dataSvg.content.match(/<svg[\s\S]*?<\/svg>/i);
+// 		dataSvg.content = svgMatch ? svgMatch[0] : "";
+// 		console.log("svgCode: ", dataSvg.content);
+// 		console.log("svgCode: ", dataSvg);
+//         chatHistory.push(dataSvg);
+//         // Update the SVG record in PocketBase
+//         const updatedData = {
+//             code_svg: dataSvg.content,
+//             chat_history: JSON.stringify(chatHistory),
+//         };
+//         try {
+//             svg = await pb.collection(Collections.Svg).update(svg.id, updatedData);
+//             // Refresh the page to show the updated SVG and chat history
+//             Astro.redirect(Astro.request.url);
+//         } catch (error) {
+//             console.error('Failed to update SVG:', error);
+//         }
+//     } else {
+//         console.warn('Edit prompt is empty or SVG not found.');
+//     }
+// }
+---
+
+<Layout title={svg ? svg.nom : "SVG Details"}>
+    <div class="flex w-full h-full">
+        <div
+            id="svg-preview"
+            class="card bg-base-300 rounded-box grid h-full w-3/4 grow place-items-center"
+            set:html={svg?.code_svg}
+        />
+        <div class="divider divider-horizontal"></div>
+        <div
+            class="card bg-accent rounded-box h-full w-full grow p-6 overflow-y-auto"
+        >
+            <h2 class="text-xl font-bold mb-4 text-center text-primary">
+                Conversation
+            </h2>
+            <div
+                id="chat-history"
+                class="flex flex-col gap-4 w-full mb-20 overflow-y-auto flex-grow"
+            >
+                {
+                    Array.isArray(svg?.chat_history) &&
+                    svg.chat_history.length > 0 ? (
+                        svg.chat_history.map(
+                            (msg: { role: unknown; content: unknown }) => (
+                                <div
+                                    class={`chat ${msg.role === "user" ? "chat-start" : "chat-end"}`}
+                                >
+                                    <div
+                                        class={`chat-bubble ${msg.role === "user" ? "bg-primary text-primary-content" : "bg-secondary text-secondary-content"}`}
+                                    >
+                                        <pre>${msg.content}</pre>
+                                    </div>
+                                    <div class="chat-footer opacity-60 text-xs mt-1">
+                                        {msg.role}
+                                    </div>
+                                </div>
+                            ),
+                        )
+                    ) : (
+                        <span class="text-error">No chat history.</span>
+                    )
+                }
+            </div>
+            <form
+                id="inputPromptForm"
+                class="flex flex-col gap-2 w-full absolute bottom-0 left-0 right-0 bg-base-300 p-4"
+                method="POST"
+                autocomplete="off"
+            >
+                <input
+                    type="hidden"
+                    name="history"
+                    value={JSON.stringify(svg?.chat_history)}
+                />
+                <input type="hidden" name="id" value={svg?.id} />
+                <div class="flex items-center gap-2">
+                    <input
+                        id="prompt-input"
+                        name="editPrompt"
+                        type="text"
+                        class="input flex-grow"
+                        placeholder="Enter a prompt to edit the SVG..."
+                    />
+                    <button class="btn btn-primary" type="submit">Edit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</Layout>
+
+<script>
+    //@ts-nocheck
+    const form = document.getElementById("inputPromptForm");
+    const svgPreview = document.getElementById("svg-preview");
+    const chatHistory = document.getElementById("chat-history");
+
+    async function generateSVG(prompt) {
+        console.log("Generating SVG for prompt:", prompt);
+        const res = await fetch("/api/generateSVG", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt }),
+        });
+        const data = await res.json();
+        return data.svg;
+    }
+
+    function scrollToBottom() {
+        console.log("Scrolling to bottom");
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    const update = async (updatedData) => {
+        const response = await fetch("/api/updateSVG", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatedData),
+        });
+        return response;
+    };
+
+    form?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(form);
+        console.log(JSON.stringify(Object.fromEntries(formData)));
+        let prompt = {
+            role: "user",
+            content: formData.get("editPrompt"),
+        };
+        let history = JSON.parse(formData.get("history"));
+        history.push(prompt);
+        document.getElementById("prompt-input").value = "";
+        svgPreview.innerHTML += `<span class="loading loading-ring loading-xl"></span>`;
+        chatHistory.innerHTML += `
+        
+            <div class="chat chat-start">
+                <div class="chat-bubble bg-primary text-primary-content">${prompt.content}</div>
+                <div class="chat-footer opacity-60 text-xs mt-1">${prompt.role}</div>
+            </div>
+        `;
+        let aiResponse = await generateSVG(history);
+        history.push(aiResponse);
+        const svgMatch = aiResponse.content.match(/<svg[\s\S]*?<\/svg>/i);
+        aiResponse.content = svgMatch ? svgMatch[0] : "";
+        console.log("svgCode: ", aiResponse.content);
+        svgPreview.innerHTML = aiResponse.content;
+        chatHistory.innerHTML += `
+            <div class="chat chat-end">
+                <div class="chat-bubble bg-secondary text-secondary-content"><pre>${aiResponse.content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></div>
+                <div class="chat-footer opacity-60 text-xs mt-1">${aiResponse.role}</div>
+            </div>
+        `;
+        scrollToBottom();
+        const response = await update({
+            id: formData.get("id"),
+            code_svg: aiResponse.content,
+            chat_history: JSON.stringify(history),
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            alert("SVG updated successfully");
+        } else {
+            alert("Failed to update SVG");
+        }
+        form.reset();
+    });
+
+    scrollToBottom();
+</script>
