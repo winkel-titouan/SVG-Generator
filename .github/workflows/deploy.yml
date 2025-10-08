@@ -46,7 +46,7 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         port: 22038
         script: |
-          cd /var/www/<dossier_app>/server
+          cd /var/www/evaluation-vps/server
           npm ci
           npm install astro
           npm install send server-destroy
