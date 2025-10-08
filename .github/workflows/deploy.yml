@@ -50,4 +50,4 @@ jobs:
           npm ci
           npm install astro
           npm install send server-destroy
-          PORT=8083 pm2 restart evaluation-vps || PORT=8083 pm2 start entry.mjs --name evaluation-vps
+          PORT=8085 pm2 restart evaluation-vps || PORT=8085 pm2 start entry.mjs --name evaluation-vps
